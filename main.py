@@ -1,63 +1,33 @@
-import torch
-from torch_geometric.loader import DataLoader
-import random
-import numpy as np
-
-from dataset import build_graphs
-from model import GCN
-from train import train
-from explain import create_explainer
+from dataset import download_dataset
+from feature_extractor import extract_features
+from graph_builder import build_graph
+from gnn_model import GNN
+from train import train_model
+from explain import run_explainer
 from visualize import visualize_graph
 
 
 def main():
 
-    seed=42
+    print("\n===== STEP 1: DOWNLOAD DATASET =====")
+    dataset_path = download_dataset()
 
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
+    print("\n===== STEP 2: EXTRACT FEATURES =====")
+    features = extract_features(dataset_path)
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("\n===== STEP 3: BUILD GRAPH =====")
+    graph = build_graph(features)
 
-    graphs,label_map = build_graphs(device)
+    print("\n===== STEP 4: TRAIN GNN =====")
+    model = GNN(graph.x.shape[1])
+    train_model(model, graph)
 
-    random.shuffle(graphs)
+    print("\n===== STEP 5: RUN GNN EXPLAINER =====")
+    explanation = run_explainer(model, graph)
 
-    train_size=int(0.8*len(graphs))
-
-    train_graphs=graphs[:train_size]
-    test_graphs=graphs[train_size:]
-
-    train_loader = DataLoader(train_graphs,batch_size=8,shuffle=True)
-    test_loader = DataLoader(test_graphs,batch_size=8)
-
-    input_dim = graphs[0].x.shape[1]
-
-    model = GCN(input_dim).to(device)
-
-    optimizer = torch.optim.Adam(model.parameters(),lr=0.0005)
-
-    for epoch in range(50):
-
-        loss = train(model,train_loader,optimizer,device)
-
-        print("Epoch",epoch+1,"Loss",loss)
-
-    explainer = create_explainer(model)
-
-    data=test_graphs[0].to(device)
-
-    explanation = explainer(
-
-        x=data.x,
-        edge_index=data.edge_index,
-        index=0
-
-    )
-
-    visualize_graph(data.cpu(),explanation)
+    print("\n===== STEP 6: VISUALIZE GRAPH =====")
+    visualize_graph(graph)
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
