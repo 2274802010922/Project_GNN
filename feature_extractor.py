@@ -38,4 +38,4 @@ def extract_features(dataset_path):
 
     print("Total images:", len(features))
 
-    return features
+    return features, image_paths
