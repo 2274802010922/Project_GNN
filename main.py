@@ -3,7 +3,7 @@ from feature_extractor import extract_features
 from graph_builder import build_graph
 from gnn_model import GNN
 from train import train_model
-from explain import run_explainer
+from explain import run_gnn_explainer, visualize_explanation
 from visualize import visualize_graph
 from interactive_graph import visualize_interactive_graph
 
@@ -24,8 +24,8 @@ def main():
     train_model(model, graph)
 
     print("\n===== STEP 5: RUN GNN EXPLAINER =====")
-        
     node_mask, edge_mask = run_gnn_explainer(model, data)
+    visualize_explanation(graph, edge_mask)
     
     print("\n===== STEP 6: VISUALIZE GRAPH =====")
     
@@ -37,6 +37,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
