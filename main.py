@@ -5,6 +5,7 @@ from gnn_model import GNN
 from train import train_model
 from explain import run_explainer
 from visualize import visualize_graph
+from interactive_graph import visualize_interactive_graph
 
 
 def main():
@@ -24,12 +25,17 @@ def main():
 
     print("\n===== STEP 5: RUN GNN EXPLAINER =====")
         
-    explanation = run_gnn_explainer(model, data)
+    explanation, edge_mask = run_gnn_explainer(model, data)
     
     print("\n===== STEP 6: VISUALIZE GRAPH =====")
     
     visualize_graph(data, image_paths)
 
+    print("\n===== STEP 7: INTERACTIVE GRAPH =====")
+        
+    visualize_interactive_graph(data, image_paths, edge_mask)
+
 if __name__ == "__main__":
     main()
+
 
