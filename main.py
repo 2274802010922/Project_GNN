@@ -24,20 +24,17 @@ def main():
     train_model(model, graph)
 
     print("\n===== STEP 5: RUN GNN EXPLAINER =====")
-    node_mask, edge_mask = run_gnn_explainer(model, data)
+    node_mask, edge_mask = run_gnn_explainer(model, graph)
+
+    print("\n===== STEP 5B: VISUALIZE EXPLANATION =====")
     visualize_explanation(graph, edge_mask)
-    
+
     print("\n===== STEP 6: VISUALIZE GRAPH =====")
-    
-    visualize_graph(data, image_paths)
+    visualize_graph(graph, image_paths)
 
     print("\n===== STEP 7: INTERACTIVE GRAPH =====")
-        
-    visualize_interactive_graph(data, image_paths, edge_mask)
+    visualize_interactive_graph(graph, image_paths, edge_mask)
+
 
 if __name__ == "__main__":
     main()
-
-
-
-
