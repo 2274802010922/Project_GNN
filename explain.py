@@ -4,6 +4,8 @@ from torch_geometric.explain.config import ModelConfig
 
 def run_explainer(model, data):
 
+    model.eval()   
+
     explainer = Explainer(
         model=model,
         algorithm=GNNExplainer(epochs=100),
