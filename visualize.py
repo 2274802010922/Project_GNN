@@ -25,11 +25,13 @@ def visualize_graph(data, image_paths):
 
     fig, ax = plt.subplots(figsize=(10,8))
 
+    # draw edges only
     nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.3)
-    nx.draw_networkx_nodes(G, pos, node_size=0)
-    nx.draw_networkx_labels(G, pos, labels={})
 
-    # add images on nodes
+    # hide default nodes
+    nx.draw_networkx_nodes(G, pos, node_size=0)
+
+    # add images
     for node in G.nodes:
 
         img = Image.open(image_paths[node])
