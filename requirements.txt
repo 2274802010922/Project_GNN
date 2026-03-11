@@ -4,5 +4,5 @@ torch-geometric
 kagglehub
 networkx
 matplotlib
-numpy
+scikit-learn
 Pillow
