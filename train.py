@@ -1,56 +1,36 @@
 import torch
-import torch.nn.functional as F
 
-def prototype_loss(embeddings, labels):
+def train_model(model, train_loader, test_loader, epochs=50, lr=0.001):
 
-    unique_labels = labels.unique()
-    prototypes = []
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    criterion = torch.nn.CrossEntropyLoss()
 
-    for lab in unique_labels:
+    for epoch in range(epochs):
 
-        mask = labels == lab
-        proto = embeddings[mask].mean(dim=0)
-        prototypes.append(proto)
+        model.train()
+        total_loss = 0
 
-    prototypes = torch.stack(prototypes)
+        for data in train_loader:
 
-    dists = torch.cdist(embeddings, prototypes)
+            optimizer.zero_grad()
 
-    label_map = {lab.item(): i for i, lab in enumerate(unique_labels)}
+            out = model(data.x, data.edge_index, data.batch)
 
-    new_labels = torch.tensor(
-        [label_map[l.item()] for l in labels]
-    ).to(labels.device)
+            loss = criterion(out, data.y)
 
-    loss = F.cross_entropy(-dists, new_labels)
+            loss.backward()
+            optimizer.step()
 
-    return loss
+            total_loss += loss.item()
 
+        acc = evaluate(model, test_loader)
 
-def train(model, loader, optimizer, device):
+        print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}, Test Acc: {acc:.4f}")
 
-    model.train()
-    total_loss = 0
-
-    for data in loader:
-
-        data = data.to(device)
-
-        optimizer.zero_grad()
-
-        embeddings = model(data.x, data.edge_index)
-
-        loss = prototype_loss(embeddings, data.y)
-
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-
-    return total_loss / len(loader)
+    return model
 
 
-def test(model, loader, device):
+def evaluate(model, loader):
 
     model.eval()
 
@@ -61,33 +41,12 @@ def test(model, loader, device):
 
         for data in loader:
 
-            data = data.to(device)
+            out = model(data.x, data.edge_index, data.batch)
 
-            embeddings = model(data.x, data.edge_index)
+            pred = out.argmax(dim=1)
 
-            unique_labels = data.y.unique()
+            correct += (pred == data.y).sum().item()
 
-            prototypes = []
-
-            for lab in unique_labels:
-
-                mask = data.y == lab
-                proto = embeddings[mask].mean(dim=0)
-                prototypes.append(proto)
-
-            prototypes = torch.stack(prototypes)
-
-            dists = torch.cdist(embeddings, prototypes)
-
-            preds = dists.argmin(dim=1)
-
-            label_map = {lab.item(): i for i, lab in enumerate(unique_labels)}
-
-            true_labels = torch.tensor(
-                [label_map[l.item()] for l in data.y]
-            ).to(device)
-
-            correct += (preds == true_labels).sum().item()
             total += data.y.size(0)
 
     return correct / total
