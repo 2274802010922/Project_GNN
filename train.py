@@ -1,52 +1,56 @@
 import torch
-
-def train_model(model, train_loader, test_loader, epochs=50, lr=0.001):
-
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-    criterion = torch.nn.CrossEntropyLoss()
-
-    for epoch in range(epochs):
-
-        model.train()
-        total_loss = 0
-
-        for data in train_loader:
-
-            optimizer.zero_grad()
-
-            out = model(data.x, data.edge_index, data.batch)
-
-            loss = criterion(out, data.y)
-
-            loss.backward()
-            optimizer.step()
-
-            total_loss += loss.item()
-
-        acc = evaluate(model, test_loader)
-
-        print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}, Test Acc: {acc:.4f}")
-
-    return model
+import torch.nn.functional as F
 
 
-def evaluate(model, loader):
+def prototype_loss(embeddings,labels):
 
-    model.eval()
+    unique_labels = labels.unique()
 
-    correct = 0
-    total = 0
+    prototypes = []
 
-    with torch.no_grad():
+    for lab in unique_labels:
 
-        for data in loader:
+        mask = labels == lab
 
-            out = model(data.x, data.edge_index, data.batch)
+        proto = embeddings[mask].mean(dim=0)
 
-            pred = out.argmax(dim=1)
+        prototypes.append(proto)
 
-            correct += (pred == data.y).sum().item()
+    prototypes = torch.stack(prototypes)
 
-            total += data.y.size(0)
+    dists = torch.cdist(embeddings,prototypes)
 
-    return correct / total
+    label_map = {lab.item():i for i,lab in enumerate(unique_labels)}
+
+    new_labels = torch.tensor(
+        [label_map[l.item()] for l in labels]
+    ).to(embeddings.device)
+
+    loss = F.cross_entropy(-dists,new_labels)
+
+    return loss
+
+
+def train(model,loader,optimizer,device):
+
+    model.train()
+
+    total_loss = 0
+
+    for data in loader:
+
+        data = data.to(device)
+
+        optimizer.zero_grad()
+
+        embeddings = model(data.x,data.edge_index)
+
+        loss = prototype_loss(embeddings,data.y)
+
+        loss.backward()
+
+        optimizer.step()
+
+        total_loss += loss.item()
+
+    return total_loss / len(loader)
