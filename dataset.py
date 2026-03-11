@@ -194,7 +194,7 @@ try:
 except:
     print("PyG not installed")
 
-Tạo dataset graph
+#Tạo dataset graph
 
 import os
 import json
@@ -281,7 +281,7 @@ for label_file in os.listdir(label_dir):
 
     edge_index = torch.tensor(edge_index).t().contiguous()
 
-    # ✅ USE GLOBAL LABEL MAP HERE
+    # USE GLOBAL LABEL MAP HERE
     y = torch.tensor([GLOBAL_LABEL_MAP[l] for l in labels], dtype=torch.long)
 
     data = Data(x=x, edge_index=edge_index, y=y)
@@ -639,3 +639,4 @@ plt.title("GNNExplainer - Important Subgraph")
 plt.axis("off")
 
 plt.show()
+
