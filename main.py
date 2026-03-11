@@ -1,37 +1,63 @@
 import torch
-import os
+from torch_geometric.loader import DataLoader
+import random
+import numpy as np
 
 from dataset import build_graphs
-from model import GNNModel
+from model import GCN
 from train import train
-from explainer import explain
+from explain import create_explainer
+from visualize import visualize_graph
 
 
 def main():
 
-    dataset_path = "dataset"   # folder dataset images
+    seed=42
 
-    if os.path.exists("graphs.pt"):
-        print("Loading graphs...")
-        graphs = torch.load("graphs.pt")
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
-    else:
-        print("Building graphs...")
-        graphs = build_graphs(dataset_path)
-        torch.save(graphs, "graphs.pt")
-        print("Graphs saved!")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_features = graphs[0].num_node_features
-    num_classes = len(set([g.y.item() for g in graphs]))
+    graphs,label_map = build_graphs(device)
 
-    model = GNNModel(num_features, 64, num_classes)
+    random.shuffle(graphs)
 
-    train(model, graphs)
+    train_size=int(0.8*len(graphs))
 
-    explanation = explain(model, graphs[0])
+    train_graphs=graphs[:train_size]
+    test_graphs=graphs[train_size:]
 
-    print("Explanation generated")
+    train_loader = DataLoader(train_graphs,batch_size=8,shuffle=True)
+    test_loader = DataLoader(test_graphs,batch_size=8)
+
+    input_dim = graphs[0].x.shape[1]
+
+    model = GCN(input_dim).to(device)
+
+    optimizer = torch.optim.Adam(model.parameters(),lr=0.0005)
+
+    for epoch in range(50):
+
+        loss = train(model,train_loader,optimizer,device)
+
+        print("Epoch",epoch+1,"Loss",loss)
+
+    explainer = create_explainer(model)
+
+    data=test_graphs[0].to(device)
+
+    explanation = explainer(
+
+        x=data.x,
+        edge_index=data.edge_index,
+        index=0
+
+    )
+
+    visualize_graph(data.cpu(),explanation)
 
 
-if __name__ == "__main__":
+if __name__=="__main__":
     main()
