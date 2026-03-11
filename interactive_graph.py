@@ -37,7 +37,12 @@ def visualize_interactive_graph(data, image_paths, edge_mask=None):
 
         G.add_edge(src, dst, color=color, width=width)
 
-    net = Network(height="750px", width="100%", notebook=True)
+    net = Network(
+        height="750px",
+        width="100%",
+        notebook=True,
+        cdn_resources="in_line"
+    )
 
     net.from_nx(G)
 
