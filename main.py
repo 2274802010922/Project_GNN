@@ -13,7 +13,7 @@ def main():
     dataset_path = download_dataset()
 
     print("\n===== STEP 2: EXTRACT FEATURES =====")
-    features = extract_features(dataset_path)
+    features, image_paths = extract_features(dataset_path)
 
     print("\n===== STEP 3: BUILD GRAPH =====")
     graph = build_graph(features)
@@ -26,7 +26,7 @@ def main():
     explanation = run_explainer(model, graph)
 
     print("\n===== STEP 6: VISUALIZE GRAPH =====")
-    visualize_graph(graph)
+    visualize_graph(graph, image_paths)
 
 
 if __name__ == "__main__":
