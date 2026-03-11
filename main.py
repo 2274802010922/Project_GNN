@@ -1,9 +1,13 @@
 import torch
+import random
+import numpy as np
 
 from dataset import build_graph_dataset
-from model import GNN
-from train import train_model
+from model import GCN
+from train import train
 from explainer import run_explainer
+
+from torch_geometric.loader import DataLoader
 
 
 def main():
@@ -30,4 +34,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
