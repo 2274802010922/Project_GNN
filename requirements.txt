@@ -4,3 +4,5 @@ torch-geometric
 networkx
 matplotlib
 kagglehub
+numpy
+
