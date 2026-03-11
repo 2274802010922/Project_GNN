@@ -1,5 +1,6 @@
 from pyvis.network import Network
 import networkx as nx
+from IPython.display import display, HTML
 
 
 def visualize_interactive_graph(data, image_paths, edge_mask=None):
@@ -26,7 +27,8 @@ def visualize_interactive_graph(data, image_paths, edge_mask=None):
         color = "gray"
         width = 1
 
-        if edge_mask is not None:
+        if edge_mask is not None and i < len(edge_mask):
+
             importance = edge_mask[i].item()
 
             if importance > 0.5:
@@ -40,3 +42,5 @@ def visualize_interactive_graph(data, image_paths, edge_mask=None):
     net.from_nx(G)
 
     net.show("graph.html")
+
+    display(HTML("graph.html"))
