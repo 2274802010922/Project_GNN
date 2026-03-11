@@ -1,8 +1,10 @@
+streamlit
 torch
 torchvision
 torch-geometric
+scikit-learn
 networkx
 matplotlib
-kagglehub
-Pillow
 pyvis
+pillow
+kagglehub
