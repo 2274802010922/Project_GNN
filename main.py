@@ -25,7 +25,7 @@ def main():
 
     print("\n===== STEP 5: RUN GNN EXPLAINER =====")
         
-    explanation, edge_mask = run_gnn_explainer(model, data)
+    node_mask, edge_mask = run_gnn_explainer(model, data)
     
     print("\n===== STEP 6: VISUALIZE GRAPH =====")
     
@@ -37,5 +37,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
