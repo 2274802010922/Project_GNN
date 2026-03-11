@@ -1,56 +1,31 @@
 import torch
 import torch.nn.functional as F
+from torch_geometric.loader import DataLoader
 
+def train(model, graphs, epochs=30):
 
-def prototype_loss(embeddings,labels):
+    loader = DataLoader(graphs, batch_size=8, shuffle=True)
 
-    unique_labels = labels.unique()
-
-    prototypes = []
-
-    for lab in unique_labels:
-
-        mask = labels == lab
-
-        proto = embeddings[mask].mean(dim=0)
-
-        prototypes.append(proto)
-
-    prototypes = torch.stack(prototypes)
-
-    dists = torch.cdist(embeddings,prototypes)
-
-    label_map = {lab.item():i for i,lab in enumerate(unique_labels)}
-
-    new_labels = torch.tensor(
-        [label_map[l.item()] for l in labels]
-    ).to(embeddings.device)
-
-    loss = F.cross_entropy(-dists,new_labels)
-
-    return loss
-
-
-def train(model,loader,optimizer,device):
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
 
     model.train()
 
-    total_loss = 0
+    for epoch in range(epochs):
 
-    for data in loader:
+        total_loss = 0
 
-        data = data.to(device)
+        for data in loader:
 
-        optimizer.zero_grad()
+            optimizer.zero_grad()
 
-        embeddings = model(data.x,data.edge_index)
+            out = model(data.x.float(), data.edge_index, data.batch)
 
-        loss = prototype_loss(embeddings,data.y)
+            loss = F.cross_entropy(out, data.y)
 
-        loss.backward()
+            loss.backward()
 
-        optimizer.step()
+            optimizer.step()
 
-        total_loss += loss.item()
+            total_loss += loss.item()
 
-    return total_loss / len(loader)
+        print(f"Epoch {epoch+1}, Loss: {total_loss:.4f}")
