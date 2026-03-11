@@ -1,38 +1,37 @@
 import torch
-import random
-import numpy as np
+import os
 
-from dataset import build_graph_dataset
-from model import GCN
+from dataset import build_graphs
+from model import GNNModel
 from train import train
-from explainer import run_explainer
-
-from torch_geometric.loader import DataLoader
+from explainer import explain
 
 
 def main():
 
-    # giả sử bạn đã load graphs trước đó
-    graphs = torch.load("graphs.pt")
+    dataset_path = "dataset"   # folder dataset images
 
-    print("Total graphs:", len(graphs))
+    if os.path.exists("graphs.pt"):
+        print("Loading graphs...")
+        graphs = torch.load("graphs.pt")
 
-    train_loader, test_loader = build_dataloaders(graphs)
+    else:
+        print("Building graphs...")
+        graphs = build_graphs(dataset_path)
+        torch.save(graphs, "graphs.pt")
+        print("Graphs saved!")
 
-    input_dim = graphs[0].num_node_features
+    num_features = graphs[0].num_node_features
     num_classes = len(set([g.y.item() for g in graphs]))
 
-    model = GNN(input_dim, 64, num_classes)
+    model = GNNModel(num_features, 64, num_classes)
 
-    model = train_model(model, train_loader, test_loader)
+    train(model, graphs)
 
-    # chạy explainer cho graph đầu
-    explanation = run_explainer(model, graphs[0])
+    explanation = explain(model, graphs[0])
 
-    print("Explainer finished")
+    print("Explanation generated")
 
 
 if __name__ == "__main__":
     main()
-
-
