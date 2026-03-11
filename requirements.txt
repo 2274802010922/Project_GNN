@@ -1,8 +1,6 @@
 torch
 torchvision
 torch-geometric
-kagglehub
 networkx
 matplotlib
-scikit-learn
-Pillow
+kagglehub
