@@ -1,10 +1,9 @@
 from torch_geometric.explain import Explainer, GNNExplainer
 from torch_geometric.explain.config import ModelConfig
+import matplotlib.pyplot as plt
 
 
 def run_explainer(model, data):
-
-    model.eval()
 
     explainer = Explainer(
         model=model,
@@ -21,12 +20,17 @@ def run_explainer(model, data):
         edge_mask_type="object"
     )
 
-    explanation = explainer(
-        data.x,
-        data.edge_index,
-        index=0
-    )
+    explanation = explainer(data.x, data.edge_index)
 
     print("GNNExplainer finished")
+
+    # print importance
+    print("Top important edges:")
+    print(explanation.edge_mask[:10])
+
+    # visualize explanation
+    explanation.visualize_graph()
+
+    plt.show()
 
     return explanation
