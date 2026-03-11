@@ -3,6 +3,7 @@ import torch
 from torchvision import models, transforms
 from PIL import Image
 
+
 def extract_features(dataset_path):
 
     model = models.resnet18(pretrained=True)
@@ -10,18 +11,18 @@ def extract_features(dataset_path):
     model.eval()
 
     transform = transforms.Compose([
-        transforms.Resize((224,224)),
+        transforms.Resize((224, 224)),
         transforms.ToTensor()
     ])
 
     features = []
-    image_paths = []   # ← THÊM DÒNG NÀY
+    image_paths = []
 
     for root, dirs, files in os.walk(dataset_path):
 
         for file in files:
 
-            if file.endswith(".png") or file.endswith(".jpg"):
+            if file.endswith(".jpg") or file.endswith(".png"):
 
                 img_path = os.path.join(root, file)
 
@@ -34,7 +35,7 @@ def extract_features(dataset_path):
                 feature = feature.squeeze().numpy()
 
                 features.append(feature)
-                image_paths.append(img_path)   # ← THÊM DÒNG NÀY
+                image_paths.append(img_path)
 
     print("Total images:", len(features))
 
