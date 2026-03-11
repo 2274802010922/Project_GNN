@@ -10,13 +10,7 @@ def run_gnn_explainer(model, data):
 
     model.eval()
 
-    explainer = Explainer(
-        model=model,
-        algorithm=GNNExplainer(epochs=200),
-        explanation_type='model',
-        node_mask_type='attributes',
-        edge_mask_type='object'
-    )
+    explainer = GNNExplainer(model, epochs=200)
 
     explanation = explainer(
         x=data.x,
@@ -26,14 +20,13 @@ def run_gnn_explainer(model, data):
     node_mask = explanation.node_mask
     edge_mask = explanation.edge_mask
 
-    print("Node importance shape:", node_mask.shape)
-    print("Edge importance shape:", edge_mask.shape)
+    print("Top important nodes:")
+    print(node_mask.mean(dim=1))
 
-    visualize_explanation(data, edge_mask)
+    print("Top important edges:")
+    print(edge_mask[:10])
 
-    print("GNNExplainer finished")
-
-    return explanation, edge_mask
+    return node_mask, edge_mask
 
 
 def visualize_explanation(data, edge_mask):
@@ -76,4 +69,5 @@ def visualize_explanation(data, edge_mask):
 
     plt.title("GNN Explanation Graph")
     plt.show()
+
 
