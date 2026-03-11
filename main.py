@@ -8,8 +8,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 graphs,label_map = build_graph_dataset()
 
-train_loader,test_loader,test_graphs = build_dataloaders(graphs)
-
+train_loader, test_loader = build_dataloaders(graphs)
 input_dim = graphs[0].x.shape[1]
 
 model = GCN(input_dim).to(device)
@@ -38,3 +37,4 @@ model.load_state_dict(torch.load("best_model.pth"))
 data = test_graphs[0].to(device)
 
 run_explainer(model,data)
+
