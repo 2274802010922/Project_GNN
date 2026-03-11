@@ -33,7 +33,7 @@ def run_gnn_explainer(model, data):
 
     print("GNNExplainer finished")
 
-    return explanation
+    return explanation, edge_mask
 
 
 def visualize_explanation(data, edge_mask):
@@ -76,3 +76,4 @@ def visualize_explanation(data, edge_mask):
 
     plt.title("GNN Explanation Graph")
     plt.show()
+
