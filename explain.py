@@ -11,12 +11,12 @@ def run_explainer(model, data):
         model_config=ModelConfig(
             mode="multiclass_classification",
             task_level="node",
-            return_type="raw",
+            return_type="raw"
         ),
 
         explanation_type="model",
         node_mask_type="attributes",
-        edge_mask_type="object",
+        edge_mask_type="object"
     )
 
     explanation = explainer(data.x, data.edge_index)
