@@ -1,4 +1,4 @@
-!pip install torch-geometric
+
 
 import kagglehub
 
@@ -637,4 +637,5 @@ nx.draw_networkx_labels(G, pos)
 
 plt.title("GNNExplainer - Important Subgraph")
 plt.axis("off")
+
 plt.show()
