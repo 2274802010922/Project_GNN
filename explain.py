@@ -1,12 +1,10 @@
 import torch
-from torch_geometric.explain import Explainer, GNNExplainer
+from torch_geometric.explain import GNNExplainer
 import matplotlib.pyplot as plt
 import networkx as nx
 
 
 def run_gnn_explainer(model, data):
-
-    print("===== STEP 5: RUN GNN EXPLAINER =====")
 
     model.eval()
 
@@ -39,10 +37,11 @@ def visualize_explanation(data, edge_mask):
         G.add_node(i)
 
     for i in range(edge_index.shape[1]):
+
         src = edge_index[0][i]
         dst = edge_index[1][i]
 
-        importance = edge_mask[i].item()
+        importance = edge_mask[i].item() if i < len(edge_mask) else 0
 
         if importance > 0.5:
             G.add_edge(src, dst, color="red", weight=2)
@@ -69,5 +68,3 @@ def visualize_explanation(data, edge_mask):
 
     plt.title("GNN Explanation Graph")
     plt.show()
-
-
