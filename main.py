@@ -1,40 +1,32 @@
 import torch
-from dataset import build_graph_dataset, build_dataloaders
-from model import GCN
-from train import train,test
+
+from dataset import build_dataloaders
+from model import GNN
+from train import train_model
 from explainer import run_explainer
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-graphs,label_map = build_graph_dataset()
+def main():
 
-train_loader, test_loader = build_dataloaders(graphs)
-input_dim = graphs[0].x.shape[1]
+    # giả sử bạn đã load graphs trước đó
+    graphs = torch.load("graphs.pt")
 
-model = GCN(input_dim).to(device)
+    print("Total graphs:", len(graphs))
 
-optimizer = torch.optim.Adam(model.parameters(),lr=0.0005)
+    train_loader, test_loader = build_dataloaders(graphs)
 
-best_acc = 0
+    input_dim = graphs[0].num_node_features
+    num_classes = len(set([g.y.item() for g in graphs]))
 
-for epoch in range(50):
+    model = GNN(input_dim, 64, num_classes)
 
-    loss = train(model,train_loader,optimizer)
+    model = train_model(model, train_loader, test_loader)
 
-    acc = test(model,test_loader)
+    # chạy explainer cho graph đầu
+    explanation = run_explainer(model, graphs[0])
 
-    print(f"Epoch {epoch+1}, Loss: {loss:.4f}, Test Acc: {acc:.4f}")
+    print("Explainer finished")
 
-    if acc > best_acc:
 
-        best_acc = acc
-        torch.save(model.state_dict(),"best_model.pth")
-
-print("Best Accuracy:",best_acc)
-
-model.load_state_dict(torch.load("best_model.pth"))
-
-data = test_graphs[0].to(device)
-
-run_explainer(model,data)
-
+if __name__ == "__main__":
+    main()
