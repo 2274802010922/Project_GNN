@@ -1,14 +1,27 @@
 import torch
-from torch_geometric.explain import GNNExplainer
+from torch_geometric.explain import Explainer, GNNExplainer
 import matplotlib.pyplot as plt
 import networkx as nx
 
 
 def run_gnn_explainer(model, data):
 
+    print("Running GNNExplainer...")
+
     model.eval()
 
-    explainer = GNNExplainer(model, epochs=200)
+    explainer = Explainer(
+        model=model,
+        algorithm=GNNExplainer(epochs=200),
+        explanation_type="model",
+        node_mask_type="attributes",
+        edge_mask_type="object",
+        model_config=dict(
+            mode="multiclass_classification",
+            task_level="node",
+            return_type="log_probs",
+        ),
+    )
 
     explanation = explainer(
         x=data.x,
