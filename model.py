@@ -3,20 +3,24 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 
 
-class GCN(torch.nn.Module):
+class GNN(torch.nn.Module):
 
-    def __init__(self,input_dim,hidden_dim=128):
+    def __init__(self, input_dim, hidden_dim=128, num_classes=10):
+        super(GNN, self).__init__()
 
-        super().__init__()
+        self.conv1 = GCNConv(input_dim, hidden_dim)
+        self.conv2 = GCNConv(hidden_dim, 64)
 
-        self.conv1 = GCNConv(input_dim,hidden_dim)
-        self.conv2 = GCNConv(hidden_dim,hidden_dim)
+        self.classifier = torch.nn.Linear(64, num_classes)
 
-    def forward(self,x,edge_index):
+    def forward(self, x, edge_index):
 
-        x = self.conv1(x,edge_index)
+        x = self.conv1(x, edge_index)
         x = F.relu(x)
 
-        x = self.conv2(x,edge_index)
+        x = self.conv2(x, edge_index)
+        x = F.relu(x)
+
+        x = self.classifier(x)
 
         return x
