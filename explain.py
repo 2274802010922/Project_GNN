@@ -4,7 +4,7 @@ from torch_geometric.explain.config import ModelConfig
 
 def run_explainer(model, data):
 
-    model.eval()   
+    model.eval()
 
     explainer = Explainer(
         model=model,
@@ -21,7 +21,11 @@ def run_explainer(model, data):
         edge_mask_type="object"
     )
 
-    explanation = explainer(data.x, data.edge_index)
+    explanation = explainer(
+        data.x,
+        data.edge_index,
+        index=0
+    )
 
     print("GNNExplainer finished")
 
