@@ -5,7 +5,10 @@ from PIL import Image
 import os
 
 
+# load pretrained CNN
 model = models.resnet18(weights="DEFAULT")
+
+# remove classification layer
 model = torch.nn.Sequential(*list(model.children())[:-1])
 model.eval()
 
@@ -19,13 +22,13 @@ transform = transforms.Compose([
 def extract_features(dataset_path):
 
     features = []
-    image_paths = []   # ← FIX: tạo list
+    image_paths = []   # FIX: create list
 
     for root, dirs, files in os.walk(dataset_path):
 
         for f in files:
 
-            if f.endswith(".jpg") or f.endswith(".png"):
+            if f.lower().endswith((".jpg",".png",".jpeg")):
 
                 img_path = os.path.join(root, f)
 
@@ -35,8 +38,10 @@ def extract_features(dataset_path):
                 with torch.no_grad():
                     feat = model(img)
 
-                features.append(feat.squeeze())
-                image_paths.append(img_path)   # ← FIX: lưu path
+                feat = feat.squeeze()
+
+                features.append(feat)
+                image_paths.append(img_path)   # FIX: save path
 
     print("Total images:", len(features))
 
