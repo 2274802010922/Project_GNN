@@ -1,6 +1,6 @@
 import torch
 
-from dataset import build_dataloaders
+from dataset import build_graph_dataset
 from model import GNN
 from train import train_model
 from explainer import run_explainer
@@ -30,3 +30,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
