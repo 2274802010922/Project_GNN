@@ -1,41 +1,42 @@
-import os
 import torch
-from torchvision import models, transforms
+import torchvision.models as models
+import torchvision.transforms as transforms
 from PIL import Image
+import os
+
+
+model = models.resnet18(weights="DEFAULT")
+model = torch.nn.Sequential(*list(model.children())[:-1])
+model.eval()
+
+
+transform = transforms.Compose([
+    transforms.Resize((224,224)),
+    transforms.ToTensor()
+])
 
 
 def extract_features(dataset_path):
 
-    model = models.resnet18(pretrained=True)
-    model = torch.nn.Sequential(*list(model.children())[:-1])
-    model.eval()
-
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.ToTensor()
-    ])
-
     features = []
-    image_paths = []
+    image_paths = []   # ← FIX: tạo list
 
     for root, dirs, files in os.walk(dataset_path):
 
-        for file in files:
+        for f in files:
 
-            if file.endswith(".jpg") or file.endswith(".png"):
+            if f.endswith(".jpg") or f.endswith(".png"):
 
-                img_path = os.path.join(root, file)
+                img_path = os.path.join(root, f)
 
                 img = Image.open(img_path).convert("RGB")
                 img = transform(img).unsqueeze(0)
 
                 with torch.no_grad():
-                    feature = model(img)
+                    feat = model(img)
 
-                feature = feature.squeeze().numpy()
-
-                features.append(feature)
-                image_paths.append(img_path)
+                features.append(feat.squeeze())
+                image_paths.append(img_path)   # ← FIX: lưu path
 
     print("Total images:", len(features))
 
