@@ -4,26 +4,58 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import torch
+import torch.nn.functional as F
 from torch_geometric.explain import Explainer, GNNExplainer
 
 
-def run_gnn_explainer(model, data, node_idx=None, output_dir="outputs"):
-    os.makedirs(output_dir, exist_ok=True)
+class PrototypeClassifierWrapper(torch.nn.Module):
+    def __init__(self, encoder, prototypes, temperature=0.1):
+        super().__init__()
+        self.encoder = encoder
+        self.register_buffer("prototypes", F.normalize(prototypes, p=2, dim=1))
+        self.temperature = temperature
 
-    device = next(model.parameters()).device
+    def forward(self, x, edge_index, edge_weight=None):
+        embeddings = self.encoder(x, edge_index, edge_weight=edge_weight)
+        embeddings = F.normalize(embeddings, p=2, dim=1)
+        return torch.mm(embeddings, self.prototypes.t()) / self.temperature
+
+
+def compute_full_graph_prototypes(encoder, data):
+    device = next(encoder.parameters()).device
     data = data.to(device)
-    model.eval()
-
-    if node_idx is None:
-        candidate_indices = torch.where(data.test_mask)[0]
-        if len(candidate_indices) == 0:
-            candidate_indices = torch.where(data.val_mask)[0]
-        if len(candidate_indices) == 0:
-            candidate_indices = torch.where(data.train_mask)[0]
-        node_idx = int(candidate_indices[0].item())
+    encoder.eval()
 
     with torch.no_grad():
-        logits = model(data.x, data.edge_index, data.edge_weight)
+        embeddings = encoder(data.x, data.edge_index, data.edge_weight)
+        prototypes = []
+        for class_id in range(len(data.class_names)):
+            mask = data.y == class_id
+            if int(mask.sum()) > 0:
+                prototypes.append(embeddings[mask].mean(dim=0))
+            else:
+                prototypes.append(torch.zeros(embeddings.shape[1], device=device))
+        prototypes = torch.stack(prototypes, dim=0)
+
+    return prototypes
+
+
+def run_gnn_explainer(encoder, data, node_idx=None, output_dir="outputs", temperature=0.1):
+    os.makedirs(output_dir, exist_ok=True)
+
+    device = next(encoder.parameters()).device
+    data = data.to(device)
+
+    if node_idx is None:
+        degrees = torch.bincount(data.edge_index[0], minlength=data.num_nodes)
+        node_idx = int(torch.argmax(degrees).item())
+
+    prototypes = compute_full_graph_prototypes(encoder, data)
+    wrapper = PrototypeClassifierWrapper(encoder, prototypes, temperature=temperature).to(device)
+    wrapper.eval()
+
+    with torch.no_grad():
+        logits = wrapper(data.x, data.edge_index, data.edge_weight)
         pred_class = int(logits[node_idx].argmax().item())
         true_class = int(data.y[node_idx].item())
 
@@ -32,7 +64,7 @@ def run_gnn_explainer(model, data, node_idx=None, output_dir="outputs"):
     print(f"Predicted class: {data.class_names[pred_class]}")
 
     explainer = Explainer(
-        model=model,
+        model=wrapper,
         algorithm=GNNExplainer(epochs=100),
         explanation_type="model",
         node_mask_type="attributes",
@@ -81,27 +113,27 @@ def visualize_explanation(data, edge_mask, node_idx, output_dir="outputs", thres
     edge_index = data.edge_index.cpu().numpy()
     edge_mask = edge_mask.cpu().numpy()
 
-    G = nx.Graph()
+    graph = nx.Graph()
     for i in range(data.num_nodes):
-        G.add_node(i)
+        graph.add_node(i)
 
     for i in range(edge_index.shape[1]):
         src = int(edge_index[0, i])
         dst = int(edge_index[1, i])
         score = float(edge_mask[i])
         if score >= threshold:
-            G.add_edge(src, dst, weight=score)
+            graph.add_edge(src, dst, weight=score)
 
-    if node_idx not in G:
-        G.add_node(node_idx)
+    if node_idx not in graph:
+        graph.add_node(node_idx)
 
     plt.figure(figsize=(8, 6))
-    pos = nx.spring_layout(G, seed=42)
-    node_colors = ["orange" if n == node_idx else "lightblue" for n in G.nodes()]
-    edge_widths = [2.0 + 3.0 * G[u][v]["weight"] for u, v in G.edges()] if G.number_of_edges() > 0 else None
+    pos = nx.spring_layout(graph, seed=42)
+    node_colors = ["orange" if n == node_idx else "lightblue" for n in graph.nodes()]
+    edge_widths = [2.0 + 3.0 * graph[u][v]["weight"] for u, v in graph.edges()] if graph.number_of_edges() > 0 else None
 
     nx.draw(
-        G,
+        graph,
         pos,
         with_labels=True,
         node_color=node_colors,
