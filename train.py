@@ -11,11 +11,8 @@ from sklearn.metrics import classification_report, confusion_matrix
 from graph_builder import build_class_index, build_episode_graph
 
 
+
 def prepare_fewshot_splits(labels, class_names, k_shot=1, q_query=1, seed=42):
-    """
-    Prepare class splits for few-shot episodic training.
-    If there are too few eligible classes, fallback to shared-class evaluation.
-    """
     labels = np.asarray(labels, dtype=np.int64)
     class_to_indices = build_class_index(labels)
     min_required = k_shot + q_query
@@ -86,6 +83,7 @@ def prepare_fewshot_splits(labels, class_names, k_shot=1, q_query=1, seed=42):
     return split_info
 
 
+
 def sample_episode(split_info, split_name, n_way=5, rng=None):
     if rng is None:
         rng = np.random.default_rng()
@@ -112,8 +110,8 @@ def sample_episode(split_info, split_name, n_way=5, rng=None):
     episode_indices = np.array(support_indices + query_indices, dtype=np.int64)
     support_mask = np.zeros(len(episode_indices), dtype=bool)
     query_mask = np.zeros(len(episode_indices), dtype=bool)
-    support_mask[:len(support_indices)] = True
-    query_mask[len(support_indices):] = True
+    support_mask[: len(support_indices)] = True
+    query_mask[len(support_indices) :] = True
 
     return {
         "episode_indices": episode_indices,
@@ -121,6 +119,7 @@ def sample_episode(split_info, split_name, n_way=5, rng=None):
         "query_mask": torch.tensor(query_mask, dtype=torch.bool),
         "selected_classes": np.array(selected_classes, dtype=np.int64),
     }
+
 
 
 def compute_prototypes(embeddings, labels, num_classes):
@@ -133,7 +132,8 @@ def compute_prototypes(embeddings, labels, num_classes):
     return prototypes
 
 
-def episode_forward(model, episode_data, support_mask, query_mask, temperature=0.1):
+
+def episode_forward(model, episode_data, support_mask, query_mask, temperature=0.12, label_smoothing=0.05):
     embeddings = model(episode_data.x, episode_data.edge_index, episode_data.edge_weight)
     support_emb = embeddings[support_mask]
     query_emb = embeddings[query_mask]
@@ -147,10 +147,17 @@ def episode_forward(model, episode_data, support_mask, query_mask, temperature=0
     )
 
     logits = torch.mm(query_emb, prototypes.t()) / temperature
-    loss = F.cross_entropy(logits, query_y)
+    loss = F.cross_entropy(logits, query_y, label_smoothing=label_smoothing)
+
+    # Mild prototype regularization: keep each support example close to its class prototype.
+    proto_targets = prototypes[support_y]
+    align_loss = 1.0 - F.cosine_similarity(support_emb, proto_targets, dim=1).mean()
+    loss = loss + 0.1 * align_loss
+
     preds = logits.argmax(dim=1)
     acc = float((preds == query_y).float().mean().item())
     return loss, acc, preds, query_y, embeddings
+
 
 
 def plot_training_history(history, save_path=None):
@@ -180,6 +187,7 @@ def plot_training_history(history, save_path=None):
         plt.savefig(save_path, dpi=200, bbox_inches="tight")
         print(f"Saved: {save_path}")
     plt.show()
+
 
 
 def plot_confusion_matrix(y_true, y_pred, class_names, save_path=None):
@@ -219,6 +227,7 @@ def plot_confusion_matrix(y_true, y_pred, class_names, save_path=None):
     plt.show()
 
 
+
 def evaluate_fewshot(
     model,
     features,
@@ -227,8 +236,8 @@ def evaluate_fewshot(
     split_name,
     n_way=5,
     num_episodes=50,
-    episode_graph_k=3,
-    temperature=0.1,
+    episode_graph_k=4,
+    temperature=0.12,
     device=None,
     seed=123,
 ):
@@ -263,6 +272,7 @@ def evaluate_fewshot(
                 support_mask=support_mask,
                 query_mask=query_mask,
                 temperature=temperature,
+                label_smoothing=0.0,
             )
             losses.append(float(loss.item()))
             accuracies.append(acc)
@@ -279,27 +289,30 @@ def evaluate_fewshot(
     }
 
 
+
 def train_fewshot_model(
     model,
     full_graph,
     split_info,
-    epochs=40,
-    episodes_per_epoch=30,
-    val_episodes=20,
-    test_episodes=50,
+    epochs=80,
+    episodes_per_epoch=100,
+    val_episodes=60,
+    test_episodes=100,
     n_way=5,
-    episode_graph_k=3,
-    lr=1e-3,
+    episode_graph_k=4,
+    lr=7e-4,
     weight_decay=1e-4,
-    temperature=0.1,
+    temperature=0.12,
     output_dir="outputs",
     seed=42,
+    patience=15,
 ):
     os.makedirs(output_dir, exist_ok=True)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=max(epochs, 1), eta_min=1e-5)
 
     features = full_graph.raw_features.cpu().numpy()
     global_labels = full_graph.y.cpu().numpy()
@@ -307,6 +320,8 @@ def train_fewshot_model(
     history = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []}
     best_state = copy.deepcopy(model.state_dict())
     best_val_acc = -1.0
+    best_epoch = 0
+    epochs_without_improvement = 0
 
     train_rng = np.random.default_rng(seed)
 
@@ -328,19 +343,23 @@ def train_fewshot_model(
             support_mask = episode["support_mask"].to(device)
             query_mask = episode["query_mask"].to(device)
 
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
             loss, acc, _, _, _ = episode_forward(
                 model=model,
                 episode_data=episode_data,
                 support_mask=support_mask,
                 query_mask=query_mask,
                 temperature=temperature,
+                label_smoothing=0.05,
             )
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=2.0)
             optimizer.step()
 
             epoch_losses.append(float(loss.item()))
             epoch_accs.append(acc)
+
+        scheduler.step()
 
         train_loss = float(np.mean(epoch_losses))
         train_acc = float(np.mean(epoch_accs))
@@ -368,16 +387,26 @@ def train_fewshot_model(
         if np.isnan(metric_for_selection):
             metric_for_selection = train_acc
 
-        if metric_for_selection >= best_val_acc:
+        if metric_for_selection > best_val_acc + 1e-6:
             best_val_acc = metric_for_selection
             best_state = copy.deepcopy(model.state_dict())
+            best_epoch = epoch
+            epochs_without_improvement = 0
+        else:
+            epochs_without_improvement += 1
 
         if epoch == 1 or epoch % 5 == 0 or epoch == epochs:
+            current_lr = optimizer.param_groups[0]["lr"]
             print(
                 f"Epoch {epoch:03d} | "
                 f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f} | "
-                f"Val Loss: {val_results['loss']:.4f} | Val Acc: {val_results['acc']:.4f}"
+                f"Val Loss: {val_results['loss']:.4f} | Val Acc: {val_results['acc']:.4f} | "
+                f"LR: {current_lr:.6f}"
             )
+
+        if epochs_without_improvement >= patience:
+            print(f"Early stopping at epoch {epoch} (best epoch: {best_epoch}, best val acc: {best_val_acc:.4f})")
+            break
 
     model.load_state_dict(best_state)
 
@@ -402,11 +431,14 @@ def train_fewshot_model(
     )
 
     print("\nFew-shot evaluation summary:")
+    print(f"Best epoch: {best_epoch}")
     print(f"Best validation accuracy: {best_val_acc:.4f}")
     print(f"Test episodic loss: {test_results['loss']:.4f}")
     print(f"Test episodic accuracy: {test_results['acc']:.4f}")
 
-    present_classes = sorted(set(test_results["y_true_global"].tolist()) | set(test_results["y_pred_global"].tolist()))
+    present_classes = sorted(
+        set(test_results["y_true_global"].tolist()) | set(test_results["y_pred_global"].tolist())
+    )
     if present_classes:
         report_names = [full_graph.class_names[idx] for idx in present_classes]
         print("\nClassification report on aggregated test queries:")
