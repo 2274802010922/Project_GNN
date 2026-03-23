@@ -1,7 +1,6 @@
 # Project_GNN
 
-> Few-shot Graph Neural Network for pill recognition on the mini VAIPE dataset.
-
+> Few-shot Graph Neural Network for Pill Recognition on the mini VAIPE Dataset
 ## Resources
 - **Notebook kết quả chạy trên Google Colab:** [ketqua_colab.ipynb](https://github.com/2274802010922/Project_GNN/blob/main/ketqua_colab.ipynb)
 - **Mã nguồn chính:** [main.py](https://github.com/2274802010922/Project_GNN/blob/main/main.py)
