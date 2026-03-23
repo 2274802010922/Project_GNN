@@ -8,3 +8,4 @@ matplotlib
 pyvis
 pillow
 kagglehub
+pandas
