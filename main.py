@@ -1,5 +1,7 @@
 import os
+import random
 
+import numpy as np
 import torch
 
 from dataset import download_dataset, inspect_dataset_structure, load_image_paths_and_labels
@@ -18,21 +20,33 @@ from visualize import (
 )
 
 
+
+def set_seed(seed=42):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+
+
+
 def main():
     output_dir = "outputs"
     os.makedirs(output_dir, exist_ok=True)
 
-    # Few-shot configuration
+    seed = 42
+    set_seed(seed)
+
+    # Tuned configuration for better accuracy while keeping the same few-shot + graph idea.
     k_shot = 1
     q_query = 1
     n_way = 5
-    full_graph_k = 5
-    episode_graph_k = 3
-    epochs = 40
-    episodes_per_epoch = 30
-    val_episodes = 20
-    test_episodes = 50
-    seed = 42
+    full_graph_k = 7
+    episode_graph_k = 4
+    epochs = 80
+    episodes_per_epoch = 100
+    val_episodes = 60
+    test_episodes = 100
 
     print("\n===== STEP 1: DOWNLOAD DATASET =====")
     dataset_path = download_dataset()
@@ -47,11 +61,16 @@ def main():
         inspect_dataset_structure(dataset_path)
         raise
 
+    print(f"Loaded label source: {label_source}")
+    print(f"Num samples: {len(image_paths)} | Num classes: {len(class_names)}")
+
     print("\n===== STEP 3: EXTRACT FEATURES =====")
     features = extract_features(
         image_paths,
-        batch_size=32,
-        cache_path=os.path.join(output_dir, "resnet18_features.npy"),
+        batch_size=16,
+        cache_path=os.path.join(output_dir, "resnet50_tta_features.npy"),
+        model_name="resnet50",
+        tta=True,
     )
 
     print("\n===== STEP 4: BUILD FULL GRAPH =====")
@@ -88,9 +107,9 @@ def main():
     print("\n===== STEP 7: TRAIN FEW-SHOT GNN =====")
     model = FewShotGNN(
         input_dim=full_graph.x.shape[1],
-        hidden_dim=256,
-        output_dim=128,
-        dropout=0.3,
+        hidden_dim=384,
+        output_dim=192,
+        dropout=0.35,
     )
     model, history, test_results = train_fewshot_model(
         model=model,
@@ -102,11 +121,12 @@ def main():
         test_episodes=test_episodes,
         n_way=effective_n_way,
         episode_graph_k=episode_graph_k,
-        lr=1e-3,
+        lr=7e-4,
         weight_decay=1e-4,
-        temperature=0.1,
+        temperature=0.12,
         output_dir=output_dir,
         seed=seed,
+        patience=15,
     )
 
     print("\n===== STEP 8: t-SNE BEFORE / AFTER GNN =====")
@@ -130,12 +150,12 @@ def main():
 
     print("\n===== STEP 9: RUN GNN EXPLAINER =====")
     try:
-        node_mask, edge_mask, explained_node = run_gnn_explainer(
+        _, edge_mask, _ = run_gnn_explainer(
             model,
             full_graph,
             node_idx=None,
             output_dir=output_dir,
-            temperature=0.1,
+            temperature=0.12,
         )
     except Exception as e:
         print(f"GNNExplainer failed: {e}")
