@@ -16,7 +16,7 @@ def plot_class_distribution(labels, class_names, output_dir="outputs"):
     x = np.arange(len(class_names))
     y = [counts.get(i, 0) for i in x]
 
-    plt.figure(figsize=(12, 4))
+    plt.figure(figsize=(max(12, 0.35 * len(class_names)), 5))
     plt.bar(x, y)
     plt.xticks(x, class_names, rotation=90)
     plt.xlabel("Class")
@@ -38,8 +38,9 @@ def plot_degree_distribution(data, output_dir="outputs"):
     for src, dst in edge_index.T:
         degrees[src] += 1
 
+    bins = min(20, max(5, len(np.unique(degrees))))
     plt.figure(figsize=(8, 4))
-    plt.hist(degrees, bins=min(20, max(5, len(np.unique(degrees)))))
+    plt.hist(degrees, bins=bins)
     plt.xlabel("Node degree")
     plt.ylabel("Frequency")
     plt.title("Degree Distribution")
@@ -71,29 +72,29 @@ def plot_similarity_distribution(data, output_dir="outputs"):
 def visualize_graph(data, image_paths, max_nodes=36, output_dir="outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
-    G = nx.Graph()
+    graph = nx.Graph()
     edge_index = data.edge_index.cpu().numpy()
 
     for i in range(data.num_nodes):
-        G.add_node(i)
+        graph.add_node(i)
 
     for i in range(edge_index.shape[1]):
         src = int(edge_index[0, i])
         dst = int(edge_index[1, i])
-        G.add_edge(src, dst)
+        graph.add_edge(src, dst)
 
     if data.num_nodes > max_nodes:
-        degrees = dict(G.degree())
-        selected_nodes = sorted(degrees, key=degrees.get, reverse=True)[:max_nodes]
-        G = G.subgraph(selected_nodes).copy()
+        degrees = dict(graph.degree())
+        selected = sorted(degrees, key=degrees.get, reverse=True)[:max_nodes]
+        graph = graph.subgraph(selected).copy()
 
-    pos = nx.spring_layout(G, seed=42)
+    pos = nx.spring_layout(graph, seed=42)
     fig, ax = plt.subplots(figsize=(12, 10))
 
-    nx.draw_networkx_edges(G, pos, ax=ax, alpha=0.3)
-    nx.draw_networkx_nodes(G, pos, node_size=0)
+    nx.draw_networkx_edges(graph, pos, ax=ax, alpha=0.3)
+    nx.draw_networkx_nodes(graph, pos, node_size=0)
 
-    for node in G.nodes():
+    for node in graph.nodes():
         img = Image.open(image_paths[node]).convert("RGB").resize((40, 40))
         imagebox = OffsetImage(np.array(img), zoom=1.0)
         ab = AnnotationBbox(imagebox, pos[node], frameon=False)
@@ -109,24 +110,32 @@ def visualize_graph(data, image_paths, max_nodes=36, output_dir="outputs"):
     plt.show()
 
 
+def _safe_perplexity(n_samples):
+    if n_samples <= 3:
+        return max(1, n_samples - 1)
+    return max(2, min(30, n_samples - 1))
+
+
 def plot_tsne_embeddings(features_before, features_after, labels, class_names, output_dir="outputs"):
     os.makedirs(output_dir, exist_ok=True)
 
     labels = np.asarray(labels)
-    perplexity = max(5, min(30, len(labels) - 1))
+    perplexity = _safe_perplexity(len(labels))
 
-    tsne_before = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-    emb_before = tsne_before.fit_transform(np.asarray(features_before))
-
-    tsne_after = TSNE(n_components=2, random_state=42, perplexity=perplexity)
-    emb_after = tsne_after.fit_transform(np.asarray(features_after))
+    emb_before = TSNE(n_components=2, random_state=42, perplexity=perplexity).fit_transform(
+        np.asarray(features_before)
+    )
+    emb_after = TSNE(n_components=2, random_state=42, perplexity=perplexity).fit_transform(
+        np.asarray(features_after)
+    )
 
     plt.figure(figsize=(12, 5))
 
     plt.subplot(1, 2, 1)
     for class_idx, class_name in enumerate(class_names):
         mask = labels == class_idx
-        plt.scatter(emb_before[mask, 0], emb_before[mask, 1], s=18, label=class_name)
+        if mask.any():
+            plt.scatter(emb_before[mask, 0], emb_before[mask, 1], s=18, label=class_name)
     plt.title("t-SNE Before GNN")
     plt.xlabel("Dim 1")
     plt.ylabel("Dim 2")
@@ -134,7 +143,8 @@ def plot_tsne_embeddings(features_before, features_after, labels, class_names, o
     plt.subplot(1, 2, 2)
     for class_idx, class_name in enumerate(class_names):
         mask = labels == class_idx
-        plt.scatter(emb_after[mask, 0], emb_after[mask, 1], s=18, label=class_name)
+        if mask.any():
+            plt.scatter(emb_after[mask, 0], emb_after[mask, 1], s=18, label=class_name)
     plt.title("t-SNE After GNN")
     plt.xlabel("Dim 1")
     plt.ylabel("Dim 2")
