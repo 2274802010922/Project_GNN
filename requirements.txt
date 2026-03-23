@@ -9,3 +9,4 @@ pyvis
 pillow
 kagglehub
 pandas
+numpy
