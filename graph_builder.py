@@ -7,13 +7,20 @@ from sklearn.neighbors import NearestNeighbors
 from torch_geometric.data import Data
 
 
+
 def _normalize_features(features):
     features = np.asarray(features, dtype=np.float32)
     norms = np.linalg.norm(features, axis=1, keepdims=True) + 1e-12
     return features / norms
 
 
-def build_knn_edges(features, k=5):
+
+def build_knn_edges(features, k=7, similarity_power=2.0):
+    """
+    Build a symmetric cosine k-NN graph.
+
+    similarity_power > 1.0 sharpens strong edges and weakens noisy ones.
+    """
     features = _normalize_features(features)
     num_nodes = len(features)
     if num_nodes < 2:
@@ -30,7 +37,8 @@ def build_knn_edges(features, k=5):
     for src in range(num_nodes):
         for rank in range(1, effective_k):
             dst = int(indices[src, rank])
-            sim = float(1.0 - distances[src, rank])
+            sim = max(0.0, float(1.0 - distances[src, rank]))
+            sim = sim ** similarity_power
             edge_pairs.add((src, dst))
             edge_pairs.add((dst, src))
             weight_lookup[(src, dst)] = sim
@@ -45,7 +53,8 @@ def build_knn_edges(features, k=5):
     return edge_index, edge_weight
 
 
-def build_full_graph(features, labels, image_paths, class_names, k=5):
+
+def build_full_graph(features, labels, image_paths, class_names, k=7):
     edge_index, edge_weight = build_knn_edges(features, k=k)
 
     x = torch.tensor(features, dtype=torch.float32)
@@ -68,10 +77,9 @@ def build_full_graph(features, labels, image_paths, class_names, k=5):
     return data
 
 
-def build_episode_graph(features, global_labels, episode_indices, episode_class_ids, k=3):
-    """
-    Build a local graph for one few-shot episode.
-    """
+
+def build_episode_graph(features, global_labels, episode_indices, episode_class_ids, k=4):
+    """Build a local graph for one few-shot episode."""
     episode_indices = np.asarray(episode_indices, dtype=np.int64)
     episode_features = np.asarray(features)[episode_indices]
     episode_global_y = np.asarray(global_labels)[episode_indices]
@@ -94,6 +102,7 @@ def build_episode_graph(features, global_labels, episode_indices, episode_class_
     data.episode_indices = torch.tensor(episode_indices, dtype=torch.long)
     data.episode_class_ids = torch.tensor(episode_class_ids, dtype=torch.long)
     return data
+
 
 
 def build_class_index(labels):
