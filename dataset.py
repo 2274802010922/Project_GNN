@@ -93,6 +93,35 @@ def _crop_single_box(img, box):
     return img.crop((x1, y1, x2, y2))
 
 
+def _get_writable_crop_root():
+    """
+    Choose a writable directory for generated crops.
+
+    We intentionally avoid saving inside `dataset_path` because KaggleHub can
+    return read-only locations such as `/kaggle/input/...`.
+    """
+    candidates = [
+        Path("/content/generated_crops_fewshot"),
+        Path.cwd() / "generated_crops_fewshot",
+        Path("/tmp/generated_crops_fewshot"),
+    ]
+
+    for candidate in candidates:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            test_file = candidate / ".write_test"
+            test_file.write_text("ok", encoding="utf-8")
+            test_file.unlink(missing_ok=True)
+            return candidate
+        except Exception:
+            continue
+
+    raise OSError(
+        "Could not find a writable directory for generated crops. "
+        "Tried /content, current working directory, and /tmp."
+    )
+
+
 def _load_vaipe_cropped_instances(dataset_path):
     image_dir, label_dir = _find_vaipe_roots(dataset_path)
     if image_dir is None or label_dir is None:
@@ -102,8 +131,8 @@ def _load_vaipe_cropped_instances(dataset_path):
     if not label_files:
         return None
 
-    crop_root = Path(dataset_path) / "generated_crops_fewshot"
-    crop_root.mkdir(parents=True, exist_ok=True)
+    crop_root = _get_writable_crop_root()
+    print(f"Crop output directory: {crop_root}")
 
     sample_paths = []
     sample_labels = []
@@ -150,6 +179,7 @@ def _load_vaipe_cropped_instances(dataset_path):
         for idx, box in enumerate(boxes):
             if not isinstance(box, dict):
                 continue
+
             label = _sanitize_label(box.get("label"))
             crop = _crop_single_box(img, box)
             if crop is None:
@@ -161,7 +191,7 @@ def _load_vaipe_cropped_instances(dataset_path):
             out_name = f"{json_path.stem}_box{idx}.jpg"
             out_path = class_dir / out_name
 
-            # Save once; reuse on future runs
+            # Save once; reuse on future runs.
             if not out_path.exists():
                 crop.save(out_path, quality=95)
 
@@ -226,7 +256,7 @@ def load_image_paths_and_labels(dataset_path, require_multiple_classes=True, min
 
     counts = Counter(raw_labels)
 
-    # Keep only classes with enough samples for at least 1-shot/1-query few-shot episodes
+    # Keep only classes with enough samples for at least 1-shot/1-query few-shot episodes.
     kept_classes = {cls for cls, cnt in counts.items() if cnt >= min_samples_per_class}
     filtered_paths = []
     filtered_labels = []
